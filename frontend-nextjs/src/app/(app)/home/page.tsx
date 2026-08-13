@@ -78,7 +78,7 @@ export default function HomePage() {
   const theme = useAppStore((state) => state.theme);
   const setTheme = useAppStore((state) => state.setTheme);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState<PerPageOption>(10);
   const [codes, setCodes] = useState<RedeemCode[]>([]);
