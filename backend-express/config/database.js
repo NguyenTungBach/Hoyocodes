@@ -32,6 +32,11 @@ function dialectOptions(useSsl = false) {
 const databaseUrl = parseDatabaseUrl(process.env.DATABASE_URL);
 const productionSsl = isTruthy(process.env.DB_SSL) || databaseUrl.ssl;
 
+/** Sequelize-cli migration history table — lowercase for MySQL + Postgres parity. */
+const sequelizeCliStorage = {
+    migrationStorageTableName: 'sequelizemeta'
+};
+
 module.exports = {
     development: {
         username: process.env.DB_USERNAME || 'atmtc_user',
@@ -45,6 +50,7 @@ module.exports = {
             charset: 'utf8mb4',
             collate: 'utf8mb4_unicode_ci'
         },
+        ...sequelizeCliStorage,
         logging: process.env.NODE_ENV === 'development' ? console.log : false,
         pool: {
             max: 5,
@@ -65,6 +71,7 @@ module.exports = {
             charset: 'utf8mb4',
             collate: 'utf8mb4_unicode_ci'
         },
+        ...sequelizeCliStorage,
         logging: false
     },
     production: {
@@ -79,6 +86,7 @@ module.exports = {
             charset: 'utf8mb4',
             collate: 'utf8mb4_unicode_ci'
         },
+        ...sequelizeCliStorage,
         logging: false,
         pool: {
             max: 10,

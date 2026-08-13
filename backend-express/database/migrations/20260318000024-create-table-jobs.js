@@ -7,7 +7,7 @@ module.exports = {
     async up(queryInterface, Sequelize) {
         await queryInterface.createTable('jobs', {
             id: {
-                type: Sequelize.BIGINT.UNSIGNED,
+                type: Sequelize.BIGINT,
                 allowNull: false,
                 autoIncrement: true,
                 primaryKey: true
@@ -17,23 +17,23 @@ module.exports = {
                 allowNull: false
             },
             payload: {
-                type: Sequelize.TEXT('long'),
+                type: Sequelize.TEXT,
                 allowNull: false
             },
             attempts: {
-                type: Sequelize.TINYINT.UNSIGNED,
+                type: Sequelize.SMALLINT,
                 allowNull: false
             },
             reserved_at: {
-                type: Sequelize.INTEGER.UNSIGNED,
+                type: Sequelize.INTEGER,
                 allowNull: true
             },
             available_at: {
-                type: Sequelize.INTEGER.UNSIGNED,
+                type: Sequelize.INTEGER,
                 allowNull: false
             },
             created_at: {
-                type: Sequelize.INTEGER.UNSIGNED,
+                type: Sequelize.INTEGER,
                 allowNull: false
             }
         });

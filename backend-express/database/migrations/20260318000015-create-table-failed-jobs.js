@@ -7,7 +7,7 @@ module.exports = {
     async up(queryInterface, Sequelize) {
         await queryInterface.createTable('failed_jobs', {
             id: {
-                type: Sequelize.BIGINT.UNSIGNED,
+                type: Sequelize.BIGINT,
                 allowNull: false,
                 autoIncrement: true,
                 primaryKey: true
@@ -26,11 +26,11 @@ module.exports = {
                 allowNull: false
             },
             payload: {
-                type: Sequelize.TEXT('long'),
+                type: Sequelize.TEXT,
                 allowNull: false
             },
             exception: {
-                type: Sequelize.TEXT('long'),
+                type: Sequelize.TEXT,
                 allowNull: false
             },
             failed_at: {

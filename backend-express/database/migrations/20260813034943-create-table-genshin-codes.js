@@ -11,7 +11,7 @@ module.exports = {
      */
     await queryInterface.createTable('redeem_codes', {
       id: {
-        type: Sequelize.BIGINT.UNSIGNED,
+        type: Sequelize.BIGINT,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
