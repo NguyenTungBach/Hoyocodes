@@ -1,0 +1,20 @@
+name: Daily update redeem codes
+
+on:
+  schedule:
+    # 17:00 Asia/Ho_Chi_Minh (UTC+7) → 10:00 UTC
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-codes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: GET /api/redeem-codes/update-codes
+        run: |
+          curl -fsS -X GET 'https://hoyocodes.onrender.com/api/redeem-codes/update-codes' \
+            --max-time 600 \
+            --retry 2 \
+            --retry-connrefused \
+            --retry-delay 20
