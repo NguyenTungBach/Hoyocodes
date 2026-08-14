@@ -19,9 +19,14 @@
   --hc-option-bg: #111;
   --hc-page-bg: linear-gradient(160deg, #000000 0%, #0a0a0a 55%, #0d1520 100%);
 
-  min-height: 100%;
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   padding: 16px 16px 40px;
   background: var(--hc-page-bg);
+  background-attachment: fixed;
   color: var(--hc-text);
 
   &[data-theme='light'] {

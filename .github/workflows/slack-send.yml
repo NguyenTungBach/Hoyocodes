@@ -1,0 +1,22 @@
+name: Daily Slack notify
+
+on:
+  schedule:
+    # 17:00 Asia/Ho_Chi_Minh (UTC+7) → 10:00 UTC
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  slack-send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /api/slack-send
+        env:
+          NOTIFY_SECRET: ${{ secrets.SLACK_NOTIFY_SECRET }}
+        run: |
+          curl -fsS -X POST 'https://hoyocodes.onrender.com/api/slack-send' \
+            -H 'Content-Type: application/json' \
+            -H "X-Notify-Secret: ${NOTIFY_SECRET}" \
+            --max-time 120 \
+            --retry 3 \
+            --retry-delay 15

@@ -21,12 +21,10 @@ class SlackService {
     /**
      * Verify Slack request signature (X-Slack-Signature).
      * @param {import('express').Request} req
-     * @returns {boolean}
      */
     verifySlackSignature(req) {
         const signingSecret = slackConfig.signingSecret;
         if (!signingSecret) {
-            // Dev / chưa cấu hình: cho phép (log cảnh báo).
             logger.warn(`${LOG_PREFIX} SLACK_SIGNING_SECRET missing — skipping signature check`);
             return true;
         }
@@ -37,7 +35,6 @@ class SlackService {
 
         const ts = Number(timestamp);
         if (!Number.isFinite(ts)) return false;
-        // Reject replay older than 5 minutes
         if (Math.abs(Date.now() / 1000 - ts) > 60 * 5) return false;
 
         const rawBody =
@@ -52,9 +49,10 @@ class SlackService {
             return false;
         }
 
-        const base = `v0:${timestamp}:${rawBody}`;
-        const digest = crypto.createHmac('sha256', signingSecret).update(base, 'utf8').digest('hex');
-        const expected = `v0=${digest}`;
+        const expected = `v0=${crypto
+            .createHmac('sha256', signingSecret)
+            .update(`v0:${timestamp}:${rawBody}`, 'utf8')
+            .digest('hex')}`;
 
         try {
             const a = Buffer.from(expected, 'utf8');
@@ -67,20 +65,19 @@ class SlackService {
     }
 
     /**
-     * @returns {Promise<{ total: number, byType: Record<string, Array<{ code: string, rewards: string[] }>>, siteUrl: string }>}
+     * Load active codes and format Slack text. Dùng cho slash command và webhook.
+     * @returns {Promise<{ total: number, text: string }>}
      */
-    async getActiveCodesPayload() {
+    async buildActiveCodesMessage() {
         const { result } = await this.redeemCodeRepository.listRedeemCodes({
             status: 'active',
             per_page: -1,
         });
 
-        /** @type {Record<string, Array<{ code: string, rewards: string[] }>>} */
         const byType = {};
         for (const type of RedeemCodeType.ALL) {
             byType[type] = [];
         }
-
         for (const item of result || []) {
             const type = String(item.type || '').toLowerCase();
             if (!byType[type]) byType[type] = [];
@@ -91,20 +88,10 @@ class SlackService {
         }
 
         const total = (result || []).length;
-        return { total, byType, siteUrl: slackConfig.siteUrl };
-    }
-
-    /**
-     * Plain-text summary for Slack messages.
-     * @param {{ total: number, byType: Record<string, Array<{ code: string, rewards: string[] }>>, siteUrl: string }} payload
-     */
-    formatActiveCodesText(payload) {
-        const lines = [`*HoyoCodes — Active redeem codes* (${payload.total})`, ''];
-
+        const lines = [`*HoyoCodes — Active redeem codes* (${total})`, ''];
         for (const type of RedeemCodeType.ALL) {
-            const items = payload.byType[type] || [];
-            const label = TYPE_LABELS[type] || type;
-            lines.push(`*${label}* (${items.length})`);
+            const items = byType[type] || [];
+            lines.push(`*${TYPE_LABELS[type] || type}* (${items.length})`);
             if (!items.length) {
                 lines.push('_None_');
             } else {
@@ -117,26 +104,30 @@ class SlackService {
             lines.push('');
         }
 
-        lines.push(`👉 ${payload.siteUrl}`);
-        return lines.join('\n').trim();
+        return { total, text: lines.join('\n').trim() };
     }
 
     /**
-     * Post JSON to Incoming Webhook.
-     * @param {{ text?: string, blocks?: object[], response_type?: string }} body
-     * @returns {Promise<boolean>}
+     * Gửi code active (hoặc text tuỳ ý) lên Incoming Webhook.
+     * @param {{ text?: string }} [opts]
      */
-    async sendWebhook(body) {
+    async notifyActiveCodes(opts = {}) {
+        const message = await this.buildActiveCodesMessage();
+        const text =
+            opts.text && String(opts.text).trim()
+                ? String(opts.text).trim()
+                : message.text;
+
         const url = slackConfig.webhookUrl;
         if (!url) {
             logger.warn(`${LOG_PREFIX} SLACK_WEBHOOK_URL not configured`);
-            return false;
+            return { ok: false, total: message.total, text };
         }
 
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify({ text }),
             signal: AbortSignal.timeout(10000),
         });
 
@@ -146,27 +137,11 @@ class SlackService {
                 status: res.status,
                 detail: detail.slice(0, 300),
             });
-            return false;
+            return { ok: false, total: message.total, text };
         }
 
         logger.info(`${LOG_PREFIX} webhook sent`);
-        return true;
-    }
-
-    /**
-     * Load active codes and push to Slack webhook.
-     * @param {{ text?: string }} [opts] — optional custom text (skips DB format if set alone without notifyCodes)
-     * @returns {Promise<{ ok: boolean, total: number, text: string }>}
-     */
-    async notifyActiveCodes(opts = {}) {
-        const payload = await this.getActiveCodesPayload();
-        const text =
-            opts.text && String(opts.text).trim()
-                ? String(opts.text).trim()
-                : this.formatActiveCodesText(payload);
-
-        const ok = await this.sendWebhook({ text });
-        return { ok, total: payload.total, text };
+        return { ok: true, total: message.total, text };
     }
 }
 

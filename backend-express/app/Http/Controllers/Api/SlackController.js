@@ -41,8 +41,7 @@ class SlackController {
                 text: req.body?.text,
             });
 
-            const payload = await this.slackService.getActiveCodesPayload();
-            const text = this.slackService.formatActiveCodesText(payload);
+            const { text } = await this.slackService.buildActiveCodesMessage();
 
             // in_channel = cả channel thấy; ephemeral = chỉ người gọi thấy
             const responseType =
