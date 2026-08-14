@@ -11,9 +11,14 @@ app.use('/storage', express.static(path.join(__dirname, 'public', 'storage')));
 const cors = require('./app/Http/Middleware/Cors');
 app.use(cors);
 
-// Basic middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Basic middleware — giữ rawBody để verify Slack signing secret
+const captureRawBody = (req, _res, buf) => {
+  if (buf?.length) {
+    req.rawBody = buf;
+  }
+};
+app.use(express.json({ verify: captureRawBody }));
+app.use(express.urlencoded({ extended: true, verify: captureRawBody }));
 
 // Request logging
 const requestLogging = require('./app/Http/Middleware/RequestLogging');

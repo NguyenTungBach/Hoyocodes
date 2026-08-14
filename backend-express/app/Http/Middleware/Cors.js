@@ -7,7 +7,10 @@ const cors = (req, res, next) => {
     const origin = req.headers.origin;
     res.header('Access-Control-Allow-Origin', origin || '*');
     res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With, Application, X-API-Key');
+    res.header(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Accept, Authorization, X-Requested-With, Application, X-API-Key, X-Notify-Secret, X-Slack-Signature, X-Slack-Request-Timestamp'
+    );
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Max-Age', '86400'); // 24 hours
 
