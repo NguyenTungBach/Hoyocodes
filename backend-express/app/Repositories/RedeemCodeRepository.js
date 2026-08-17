@@ -101,8 +101,9 @@ class RedeemCodeRepository {
         const toPlain = (rows) =>
             rows.map((r) => {
                 const item = r.get({ plain: true });
-                if (Array.isArray(item.rewards)) return item;
-                if (typeof item.rewards === 'string') {
+                if (Array.isArray(item.rewards)) {
+                    // ok
+                } else if (typeof item.rewards === 'string') {
                     try {
                         const parsed = JSON.parse(item.rewards);
                         item.rewards = Array.isArray(parsed) ? parsed : [];
@@ -112,6 +113,7 @@ class RedeemCodeRepository {
                 } else {
                     item.rewards = [];
                 }
+                item.is_new = RedeemCodeType.isNew(item.created_at);
                 return item;
             });
 

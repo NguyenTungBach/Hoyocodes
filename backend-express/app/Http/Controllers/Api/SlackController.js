@@ -137,6 +137,7 @@ class SlackController {
             return ResponseService.responseJson(res, HTTP_STATUS.SUCCESS, {
                 sent: true,
                 total: result.total,
+                new_total: result.newTotal ?? 0,
                 preview: result.text.slice(0, 500),
             });
         } catch (error) {

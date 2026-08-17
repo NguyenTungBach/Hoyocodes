@@ -65,10 +65,12 @@ class SlackService {
     }
 
     /**
-     * Load active codes and format Slack text. Dùng cho slash command và webhook.
-     * @returns {Promise<{ total: number, text: string }>}
+     * Load active codes từ cùng nguồn list API (`listRedeemCodes`) và format Slack text.
+     * Dùng field `is_new` từ list (created_at trong NEW_CODE_DAYS ngày).
+     * @returns {Promise<{ total: number, newTotal: number, text: string }>}
      */
     async buildActiveCodesMessage() {
+        // Cùng logic với POST /api/redeem-codes/list
         const { result } = await this.redeemCodeRepository.listRedeemCodes({
             status: 'active',
             per_page: -1,
@@ -78,17 +80,49 @@ class SlackService {
         for (const type of RedeemCodeType.ALL) {
             byType[type] = [];
         }
+
+        let newTotal = 0;
         for (const item of result || []) {
             const type = String(item.type || '').toLowerCase();
             if (!byType[type]) byType[type] = [];
+            const isNew = Boolean(item.is_new);
+            if (isNew) newTotal += 1;
             byType[type].push({
                 code: String(item.code || ''),
                 rewards: Array.isArray(item.rewards) ? item.rewards.map(String) : [],
+                isNew,
             });
         }
 
+        // Codes mới lên trước trong từng game
+        for (const type of Object.keys(byType)) {
+            byType[type].sort((a, b) => Number(b.isNew) - Number(a.isNew));
+        }
+
         const total = (result || []).length;
-        const lines = [`*HoyoCodes — Active redeem codes* (${total})`, ''];
+        const lines = [
+            `*HoyoCodes — Active redeem codes* (${total})`,
+            `_NEW = created within last ${RedeemCodeType.NEW_CODE_DAYS} days_ (${newTotal} new)`,
+            '',
+        ];
+
+        if (newTotal > 0) {
+            lines.push(`*🆕 New codes* (${newTotal})`);
+            for (const type of RedeemCodeType.ALL) {
+                const news = (byType[type] || []).filter((i) => i.isNew);
+                if (!news.length) continue;
+                lines.push(`_${TYPE_LABELS[type] || type}_`);
+                for (const item of news) {
+                    const rewards =
+                        item.rewards.length > 0 ? ` — ${item.rewards.join(', ')}` : '';
+                    lines.push(`• \`NEW\` \`${item.code}\`${rewards}`);
+                }
+            }
+            lines.push('');
+        }
+
+        lines.push('*All active codes*');
+        lines.push('');
         for (const type of RedeemCodeType.ALL) {
             const items = byType[type] || [];
             lines.push(`*${TYPE_LABELS[type] || type}* (${items.length})`);
@@ -96,15 +130,16 @@ class SlackService {
                 lines.push('_None_');
             } else {
                 for (const item of items) {
+                    const badge = item.isNew ? '`NEW` ' : '';
                     const rewards =
                         item.rewards.length > 0 ? ` — ${item.rewards.join(', ')}` : '';
-                    lines.push(`• \`${item.code}\`${rewards}`);
+                    lines.push(`• ${badge}\`${item.code}\`${rewards}`);
                 }
             }
             lines.push('');
         }
 
-        return { total, text: lines.join('\n').trim() };
+        return { total, newTotal, text: lines.join('\n').trim() };
     }
 
     /**
@@ -121,7 +156,7 @@ class SlackService {
         const url = slackConfig.webhookUrl;
         if (!url) {
             logger.warn(`${LOG_PREFIX} SLACK_WEBHOOK_URL not configured`);
-            return { ok: false, total: message.total, text };
+            return { ok: false, total: message.total, newTotal: message.newTotal, text };
         }
 
         const res = await fetch(url, {
@@ -137,11 +172,14 @@ class SlackService {
                 status: res.status,
                 detail: detail.slice(0, 300),
             });
-            return { ok: false, total: message.total, text };
+            return { ok: false, total: message.total, newTotal: message.newTotal, text };
         }
 
-        logger.info(`${LOG_PREFIX} webhook sent`);
-        return { ok: true, total: message.total, text };
+        logger.info(`${LOG_PREFIX} webhook sent`, {
+            total: message.total,
+            newTotal: message.newTotal,
+        });
+        return { ok: true, total: message.total, newTotal: message.newTotal, text };
     }
 }
 

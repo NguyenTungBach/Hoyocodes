@@ -88,7 +88,7 @@ class RedeemCodeController {
      *               status: { type: string, enum: [active, inactive] }
      *     responses:
      *       "200":
-     *         description: Success
+     *         description: Success — mỗi item có is_new (true nếu created_at trong 3 ngày)
      */
     async list(req, res, next) {
         try {
