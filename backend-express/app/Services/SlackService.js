@@ -65,41 +65,63 @@ class SlackService {
     }
 
     /**
-     * Load active codes từ cùng nguồn list API (`listRedeemCodes`) và format Slack text.
-     * Dùng field `is_new` từ list (created_at trong NEW_CODE_DAYS ngày).
-     * @returns {Promise<{ total: number, newTotal: number, text: string }>}
+     * Build Slack message:
+     * 1) Lấy code active từ API ngoài (ennead)
+     * 2) Cross-check với list DB (`listRedeemCodes` — cùng nguồn POST /api/redeem-codes/list)
+     *    - Chỉ giữ code có trong list
+     *    - Dùng `is_new` từ list (created_at so với now ≤ 3 ngày)
+     * @returns {Promise<{ total: number, newTotal: number, skipped: number, text: string }>}
      */
     async buildActiveCodesMessage() {
-        // Cùng logic với POST /api/redeem-codes/list
-        const { result } = await this.redeemCodeRepository.listRedeemCodes({
-            status: 'active',
+        // List DB — nguồn check tồn tại + is_new
+        const { result: listRows } = await this.redeemCodeRepository.listRedeemCodes({
             per_page: -1,
         });
+        const listByCode = new Map();
+        for (const row of listRows || []) {
+            const key = String(row.code || '').trim().toUpperCase();
+            if (key) listByCode.set(key, row);
+        }
 
         const byType = {};
         for (const type of RedeemCodeType.ALL) {
             byType[type] = [];
         }
 
+        let total = 0;
         let newTotal = 0;
-        for (const item of result || []) {
-            const type = String(item.type || '').toLowerCase();
-            if (!byType[type]) byType[type] = [];
-            const isNew = Boolean(item.is_new);
-            if (isNew) newTotal += 1;
-            byType[type].push({
-                code: String(item.code || ''),
-                rewards: Array.isArray(item.rewards) ? item.rewards.map(String) : [],
-                isNew,
-            });
+        let skipped = 0;
+
+        for (const type of RedeemCodeType.ALL) {
+            const remote = await this.redeemCodeRepository.getCodesByType(type);
+            for (const item of remote.active || []) {
+                const code = String(item?.code ?? '').trim();
+                if (!code) continue;
+
+                const listItem = listByCode.get(code.toUpperCase());
+                // Không có trong list → bỏ qua (chưa sync / không hợp lệ)
+                if (!listItem) {
+                    skipped += 1;
+                    continue;
+                }
+
+                const isNew = Boolean(listItem.is_new);
+                const rewards = Array.isArray(item.rewards)
+                    ? item.rewards.map(String)
+                    : Array.isArray(listItem.rewards)
+                      ? listItem.rewards.map(String)
+                      : [];
+
+                byType[type].push({ code, rewards, isNew });
+                total += 1;
+                if (isNew) newTotal += 1;
+            }
         }
 
-        // Codes mới lên trước trong từng game
         for (const type of Object.keys(byType)) {
             byType[type].sort((a, b) => Number(b.isNew) - Number(a.isNew));
         }
 
-        const total = (result || []).length;
         const lines = [
             `*HoyoCodes — Active redeem codes* (${total})`,
             `_NEW = created within last ${RedeemCodeType.NEW_CODE_DAYS} days_ (${newTotal} new)`,
@@ -139,7 +161,7 @@ class SlackService {
             lines.push('');
         }
 
-        return { total, newTotal, text: lines.join('\n').trim() };
+        return { total, newTotal, skipped, text: lines.join('\n').trim() };
     }
 
     /**
@@ -156,7 +178,13 @@ class SlackService {
         const url = slackConfig.webhookUrl;
         if (!url) {
             logger.warn(`${LOG_PREFIX} SLACK_WEBHOOK_URL not configured`);
-            return { ok: false, total: message.total, newTotal: message.newTotal, text };
+            return {
+                ok: false,
+                total: message.total,
+                newTotal: message.newTotal,
+                skipped: message.skipped,
+                text,
+            };
         }
 
         const res = await fetch(url, {
@@ -172,14 +200,27 @@ class SlackService {
                 status: res.status,
                 detail: detail.slice(0, 300),
             });
-            return { ok: false, total: message.total, newTotal: message.newTotal, text };
+            return {
+                ok: false,
+                total: message.total,
+                newTotal: message.newTotal,
+                skipped: message.skipped,
+                text,
+            };
         }
 
         logger.info(`${LOG_PREFIX} webhook sent`, {
             total: message.total,
             newTotal: message.newTotal,
+            skipped: message.skipped,
         });
-        return { ok: true, total: message.total, newTotal: message.newTotal, text };
+        return {
+            ok: true,
+            total: message.total,
+            newTotal: message.newTotal,
+            skipped: message.skipped,
+            text,
+        };
     }
 }
 

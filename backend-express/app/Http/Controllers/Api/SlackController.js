@@ -70,7 +70,8 @@ class SlackController {
      *
      * Body (optional):
      *   { "text": "custom message" } — gửi text tuỳ ý
-     *   { } — lấy toàn bộ code status=active từ DB
+     *   { } — lấy code active từ API ngoài, cross-check với /api/redeem-codes/list
+     *         (chỉ gửi code có trong list; badge NEW theo is_new)
      *
      * @openapi
      * /slack-send:
@@ -138,6 +139,7 @@ class SlackController {
                 sent: true,
                 total: result.total,
                 new_total: result.newTotal ?? 0,
+                skipped: result.skipped ?? 0,
                 preview: result.text.slice(0, 500),
             });
         } catch (error) {
