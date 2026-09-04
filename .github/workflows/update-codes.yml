@@ -3,7 +3,7 @@ name: Daily update redeem codes
 on:
   schedule:
     # 17:00 Asia/Ho_Chi_Minh (UTC+7) → 10:00 UTC
-    - cron: '0 10 * * *'
+    - cron: '0 17 * * *'
   workflow_dispatch:
 
 jobs:
