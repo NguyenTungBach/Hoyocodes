@@ -3,7 +3,7 @@ name: Daily Slack notify
 on:
   schedule:
     # 17:00 Asia/Ho_Chi_Minh (UTC+7) → 10:00 UTC
-    - cron: '0 17 * * *'
+    - cron: '17 17 * * *'
       timezone: 'Asia/Ho_Chi_Minh'
   workflow_dispatch:
 
